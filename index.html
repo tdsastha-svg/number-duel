@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Duel: Mobile Optimized</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #121212;
+            color: white;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            /* Default for Desktop: Side by Side */
+            flex-direction: row; 
+        }
+
+        /* Responsive Flip: Top and Bottom for Mobile */
+        @media (max-width: 600px) {
+            body { flex-direction: column; }
+            .side-left { border-right: none !important; border-bottom: 2px solid rgba(255,255,255,0.1); }
+        }
+
+        .side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .side-left { border-right: 2px solid rgba(255,255,255,0.1); background: #1a1a2e; }
+        .side-right { background: #16213e; }
+
+        .player-label { font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
+        .lives { font-size: 1.2rem; margin: 10px 0; }
+
+        input {
+            width: 70%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 30px;
+            border-radius: 8px;
+            border: none;
+            background: #6c5ce7;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Turn Indicator */
+        .waiting-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            font-weight: bold;
+            color: #888;
+        }
+
+        .waiting .waiting-overlay { display: flex; }
+
+        .status-msg { height: 20px; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="p1-area" class="side side-left">
+    <div class="waiting-overlay">Wait...</div>
+    <div class="player-label">Player 1</div>
+    <div id="p1-content">
+        <div id="p1-setup">
+            <input type="password" id="p1-secret" placeholder="Set Secret">
+            <button onclick="lock(1)">Lock</button>
+        </div>
+        <div id="p1-game" style="display:none">
+            <div class="lives" id="p1-lives">❤️❤️❤️❤️❤️❤️❤️</div>
+            <input type="number" id="p1-guess" placeholder="Guess">
+            <button onclick="guess(1)">Fire!</button>
+            <div class="status-msg" id="p1-status"></div>
+        </div>
+    </div>
+</div>
+
+<div id="p2-area" class="side side-right">
+    <div class="waiting-overlay">Wait...</div>
+    <div class="player-label">Player 2</div>
+    <div id="p2-content">
+        <div id="p2-setup">
+            <input type="password" id="p2-secret" placeholder="Set Secret">
+            <button onclick="lock(2)">Lock</button>
+        </div>
+        <div id="p2-game" style="display:none">
+            <div class="lives" id="p2-lives">❤️❤️❤️❤️❤️❤️❤️</div>
+            <input type="number" id="p2-guess" placeholder="Guess">
+            <button onclick="guess(2)">Fire!</button>
+            <div class="status-msg" id="p2-status"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let secrets = [null, null, null]; // Index 1 and 2
+    let lives = [null, 7, 7];
+    let turn = 1;
+
+    function lock(p) {
+        let val = document.getElementById(`p${p}-secret`).value;
+        if (val >= 1 && val <= 100) {
+            secrets[p] = parseInt(val);
+            document.getElementById(`p${p}-setup`).style.display = 'none';
+            document.getElementById(`p${p}-game`).style.display = 'block';
+            if (secrets[1] && secrets[2]) updateTurnUI();
+        }
+    }
+
+    function updateTurnUI() {
+        document.getElementById('p1-area').classList.toggle('waiting', turn !== 1);
+        document.getElementById('p2-area').classList.toggle('waiting', turn !== 2);
+    }
+
+    function guess(p) {
+        let val = parseInt(document.getElementById(`p${p}-guess`).value);
+        let opponent = (p === 1) ? 2 : 1;
+        let target = secrets[opponent];
+        let status = document.getElementById(`p${p}-status`);
+
+        if (val === target) {
+            alert(`PLAYER ${p} WINS! 🎉`);
+            location.reload();
+        } else {
+            lives[p]--;
+            document.getElementById(`p${p}-lives`).innerText = "❤️".repeat(lives[p]) + "🖤".repeat(7 - lives[p]);
+            status.innerText = val < target ? "📈 HIGHER" : "📉 LOWER";
+            status.style.color = val < target ? "#ff9f43" : "#54a0ff";
+            
+            if (lives[p] <= 0) {
+                alert(`PLAYER ${p} LOST! 💀`);
+                location.reload();
+            } else {
+                turn = opponent;
+                updateTurnUI();
+            }
+        }
+        document.getElementById(`p${p}-guess`).value = "";
+    }
+</script>
+</body>
+</html>
