@@ -7,11 +7,13 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #1a1a2e; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        .box { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        input { width: 80%; padding: 10px; margin: 10px; border-radius: 5px; border: none; }
-        button { padding: 10px 20px; border-radius: 5px; border: none; background: #6c5ce7; color: white; cursor: pointer; }
+        .box { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; border: 1px solid #444; }
+        #my-id { background: #6c5ce7; padding: 5px 10px; border-radius: 5px; font-family: monospace; cursor: pointer; display: inline-block; margin: 10px 0; }
+        input { width: 80%; padding: 12px; margin: 10px; border-radius: 8px; border: none; font-size: 1rem; }
+        button { padding: 12px 24px; border-radius: 8px; border: none; background: #00b894; color: white; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #636e72; }
         .hidden { display: none; }
-        #status { color: #feca57; margin: 15px; font-weight: bold; }
+        #status { color: #fdcb6e; margin: 15px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -20,60 +22,85 @@
     <h2>Number Duel Online</h2>
     
     <div id="connection-area">
-        <p>Your ID: <b id="my-id">...</b></p>
-        <input type="text" id="join-id" placeholder="Paste Friend's ID">
+        <p>Step 1: Share your ID with a friend</p>
+        <div id="my-id">Generating ID...</div>
+        <p style="font-size: 0.8rem;">(Click ID to copy)</p>
+        <hr style="opacity: 0.2;">
+        <p>Step 2: Or Paste Friend's ID</p>
+        <input type="text" id="join-id" placeholder="Friend's ID here">
+        <br>
         <button onclick="connectToFriend()">Connect to Friend</button>
     </div>
 
-    <div id="status">Waiting for connection...</div>
+    <div id="status">Initializing...</div>
 
     <div id="game-area" class="hidden">
         <div id="setup-phase">
-            <p>Set your secret number (1-100):</p>
-            <input type="password" id="my-secret" placeholder="Secret">
+            <h3>Set Your Secret</h3>
+            <input type="password" id="my-secret" placeholder="1-100">
             <button onclick="sendSecret()">Lock Number</button>
         </div>
 
         <div id="play-phase" class="hidden">
-            <p id="turn-indicator">Waiting for opponent...</p>
+            <h3 id="turn-indicator">Waiting...</h3>
             <input type="number" id="my-guess" placeholder="Your Guess">
             <button id="guess-btn" onclick="sendGuess()">Guess!</button>
-            <div id="hint-msg" style="margin-top:10px;"></div>
+            <div id="hint-msg" style="margin-top:15px; font-size: 1.2rem; color: #fab1a0;"></div>
         </div>
     </div>
 </div>
 
 <script>
+    const status = document.getElementById('status');
+    const myIdDisplay = document.getElementById('my-id');
+    
+    // Initialize PeerJS
     let peer = new Peer(); 
+
+    peer.on('open', (id) => {
+        myIdDisplay.innerText = id;
+        status.innerText = "Ready! Share your ID or connect to a friend.";
+    });
+
+    peer.on('error', (err) => {
+        status.innerText = "Error: " + err.type;
+        console.error(err);
+    });
+
+    // Copy to clipboard trick
+    myIdDisplay.onclick = () => {
+        navigator.clipboard.writeText(myIdDisplay.innerText);
+        alert("ID Copied!");
+    };
+
     let conn;
-    let mySecret = null;
-    let opponentSecret = null;
-    let myTurn = false;
+    let mySecret = null, opponentSecret = null, myTurn = false;
 
-    // 1. Get your ID
-    peer.on('open', (id) => { document.getElementById('my-id').innerText = id; });
-
-    // 2. Wait for Friend to connect to YOU
+    // Incoming connection
     peer.on('connection', (connection) => {
         conn = connection;
         setupConnection();
     });
 
-    // 3. YOU connect to Friend
     function connectToFriend() {
         const friendId = document.getElementById('join-id').value;
+        if (!friendId) return alert("Paste an ID first!");
         conn = peer.connect(friendId);
+        status.innerText = "Connecting...";
         setupConnection();
     }
 
     function setupConnection() {
-        document.getElementById('status').innerText = "Connected! Setting up...";
-        document.getElementById('connection-area').classList.add('hidden');
-        document.getElementById('game-area').classList.remove('hidden');
+        conn.on('open', () => {
+            status.innerText = "CONNECTED! Now set your secret numbers.";
+            document.getElementById('connection-area').classList.add('hidden');
+            document.getElementById('game-area').classList.remove('hidden');
+        });
 
         conn.on('data', (data) => {
             if (data.type === 'secret_set') {
                 opponentSecret = data.value;
+                status.innerText = "Opponent is ready!";
                 checkStart();
             } else if (data.type === 'guess') {
                 handleOpponentGuess(data.value);
@@ -82,34 +109,36 @@
     }
 
     function sendSecret() {
-        mySecret = parseInt(document.getElementById('my-secret').value);
+        const val = parseInt(document.getElementById('my-secret').value);
+        if (val < 1 || val > 100) return alert("1-100 only!");
+        mySecret = val;
         conn.send({ type: 'secret_set', value: mySecret });
-        document.getElementById('setup-phase').innerHTML = "<b>Secret Locked!</b>";
+        document.getElementById('setup-phase').innerHTML = "<p>✅ Secret Locked! Waiting for opponent...</p>";
         checkStart();
     }
 
     function checkStart() {
         if (mySecret && opponentSecret) {
             document.getElementById('play-phase').classList.remove('hidden');
-            // Host goes first
             myTurn = peer.id < conn.peer; 
             updateUI();
         }
     }
 
     function updateUI() {
-        document.getElementById('turn-indicator').innerText = myTurn ? "Your Turn!" : "Friend's Turn...";
+        document.getElementById('turn-indicator').innerText = myTurn ? "YOUR TURN" : "WAITING FOR FRIEND...";
         document.getElementById('guess-btn').disabled = !myTurn;
+        status.innerText = "Game in progress";
     }
 
     function sendGuess() {
         const g = parseInt(document.getElementById('my-guess').value);
         if (g === opponentSecret) {
-            alert("YOU WIN! 🎉");
+            alert("VICTORY! You guessed it! 🎉");
             location.reload();
         } else {
-            const hint = g < opponentSecret ? "Higher" : "Lower";
-            document.getElementById('hint-msg').innerText = hint;
+            const hint = g < opponentSecret ? "HIGHER! 📈" : "LOWER! 📉";
+            document.getElementById('hint-msg').innerText = "Last hint: " + hint;
             conn.send({ type: 'guess', value: g });
             myTurn = false;
             updateUI();
@@ -118,7 +147,7 @@
 
     function handleOpponentGuess(val) {
         if (val === mySecret) {
-            alert("YOU LOST! 💀");
+            alert("DEFEAT! They guessed your number. 💀");
             location.reload();
         } else {
             myTurn = true;
