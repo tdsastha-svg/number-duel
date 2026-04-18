@@ -3,156 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Number Duel: Online</title>
+    <title>Number Duel: Ultra Stable</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #1a1a2e; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        .box { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; border: 1px solid #444; }
-        #my-id { background: #6c5ce7; padding: 5px 10px; border-radius: 5px; font-family: monospace; cursor: pointer; display: inline-block; margin: 10px 0; }
-        input { width: 80%; padding: 12px; margin: 10px; border-radius: 8px; border: none; font-size: 1rem; }
-        button { padding: 12px 24px; border-radius: 8px; border: none; background: #00b894; color: white; cursor: pointer; font-weight: bold; }
-        button:disabled { background: #636e72; }
-        .hidden { display: none; }
-        #status { color: #fdcb6e; margin: 15px; font-style: italic; }
+        :root { --primary: #6c5ce7; --secondary: #00b894; --accent: #fdcb6e; --danger: #ff7675; --bg: #0f0c29; }
+        body { 
+            background: radial-gradient(circle at center, #24243e, #0f0c29);
+            color: white; font-family: 'Segoe UI', sans-serif; margin: 0; 
+            display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        }
+        .box { 
+            background: rgba(255, 255, 255, 0.05); padding: 30px 20px; border-radius: 24px; 
+            width: 95%; max-width: 420px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(15px); text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        input { 
+            width: 100%; padding: 15px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); 
+            background: rgba(0,0,0,0.3); color: #fff; text-align: center; font-size: 1.1rem; box-sizing: border-box;
+        }
+        button { 
+            padding: 16px; border-radius: 12px; border: none; background: var(--primary); 
+            color: white; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s;
+        }
+        button:disabled { background: #444; opacity: 0.5; }
+
+        .lives { font-size: 1.5rem; margin-bottom: 15px; }
+        .battle-layout { display: flex; gap: 10px; margin-top: 15px; align-items: stretch; }
+        .vault-path { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; padding: 10px; border-radius: 12px; }
+        .my-path { background: rgba(0, 184, 148, 0.05); border: 1px solid rgba(0, 184, 148, 0.1); }
+        .friend-path { background: rgba(255, 118, 117, 0.05); border: 1px solid rgba(255, 118, 117, 0.1); }
+        .vault-label { font-size: 0.65rem; text-transform: uppercase; color: #888; letter-spacing: 1px; margin-bottom: 10px; font-weight: bold; }
+        .vault-coin { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: bold; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+        .coin-green { background: #00b894; color: white; }
+        .coin-danger { background: rgba(255, 118, 117, 0.1); border: 2px dashed rgba(255, 118, 117, 0.4); color: var(--danger); }
+        .history-list-mini { display: flex; flex-direction: column; gap: 6px; width: 100%; align-items: center; }
+        .history-item-mini { background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 5px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
+        #status-log { font-size: 0.75rem; color: var(--accent); margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h2>Number Duel Online</h2>
-    
-    <div id="connection-area">
-        <p>Step 1: Share your ID with a friend</p>
-        <div id="my-id">Generating ID...</div>
-        <p style="font-size: 0.8rem;">(Click ID to copy)</p>
-        <hr style="opacity: 0.2;">
-        <p>Step 2: Or Paste Friend's ID</p>
-        <input type="text" id="join-id" placeholder="Friend's ID here">
-        <br>
-        <button onclick="connectToFriend()">Connect to Friend</button>
+    <div id="page-lobby" class="page active">
+        <h2>Number Duel</h2>
+        <input type="text" id="player-name" placeholder="YOUR NAME">
+        <input type="text" id="room-id" placeholder="ROOM NAME">
+        <button onclick="startPeer('p1')" style="background:var(--secondary);">CREATE</button>
+        <button onclick="startPeer('p2')" style="background:#0984e3; margin-top:10px;">JOIN</button>
     </div>
 
-    <div id="status">Initializing...</div>
+    <div id="page-waiting" class="page">
+        <h2>Linking...</h2>
+        <p id="status-log">Ready...</p>
+        <button onclick="share()" style="background:#25d366; margin-top:10px;">INVITE FRIEND 📱</button>
+    </div>
 
-    <div id="game-area" class="hidden">
-        <div id="setup-phase">
-            <h3>Set Your Secret</h3>
-            <input type="password" id="my-secret" placeholder="1-100">
-            <button onclick="sendSecret()">Lock Number</button>
+    <div id="page-secret" class="page">
+        <h2>The Vault</h2>
+        <div id="secret-setup">
+            <p>Set Your Secret Number:</p>
+            <input type="password" id="secret-input" placeholder="1-100">
+            <button onclick="lock()">LOCK SYSTEM</button>
         </div>
+        <div id="wait-status" class="page">
+            <h3 style="color:var(--secondary)">SYSTEM LOCKED</h3>
+            <p style="font-size:0.8rem">Waiting for friend...</p>
+        </div>
+    </div>
 
-        <div id="play-phase" class="hidden">
-            <h3 id="turn-indicator">Waiting...</h3>
-            <input type="number" id="my-guess" placeholder="Your Guess">
-            <button id="guess-btn" onclick="sendGuess()">Guess!</button>
-            <div id="hint-msg" style="margin-top:15px; font-size: 1.2rem; color: #fab1a0;"></div>
+    <div id="page-battle" class="page">
+        <div class="lives" id="lives-display">❤️❤️❤️❤️❤️❤️❤️</div>
+        <div class="battle-layout">
+            <div class="vault-path friend-path">
+                <div class="vault-label" id="label-me">Your Vault</div>
+                <div class="vault-coin coin-green" id="my-vault-coin">?</div>
+                <div id="friend-history" class="history-list-mini"></div>
+            </div>
+            <div class="vault-path my-path">
+                <div class="vault-label" id="label-friend">Enemy Vault</div>
+                <div class="vault-coin coin-danger">?</div>
+                <div id="my-history" class="history-list-mini"></div>
+            </div>
         </div>
+        <div id="turn-ui">
+            <h3 id="turn-text" style="font-size:1.1rem; margin:15px 0 5px 0;">...</h3>
+            <input type="number" id="guess-input" placeholder="Enter Guess">
+            <button id="guess-btn" onclick="fire()">FIRE PROBE</button>
+            <p id="hint-text" style="color:var(--accent); font-weight:bold; height:20px; font-size:0.9rem; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <div id="page-result" class="page">
+        <h1 id="res-title"></h1>
+        <p id="res-msg"></p>
+        <button onclick="requestReset()" style="background:var(--secondary);">PLAY AGAIN</button>
+        <button onclick="location.reload()" style="background:transparent; border:1px solid #444; margin-top:10px; font-size:0.8rem;">EXIT TO LOBBY</button>
     </div>
 </div>
 
 <script>
-    const status = document.getElementById('status');
-    const myIdDisplay = document.getElementById('my-id');
-    
-    // Initialize PeerJS
-    let peer = new Peer(); 
+    let peer, conn, myRole, mySecret, oppSecret, myTurn = false, myLives = 7, myName, oppName = "Enemy", roomID;
 
-    peer.on('open', (id) => {
-        myIdDisplay.innerText = id;
-        status.innerText = "Ready! Share your ID or connect to a friend.";
-    });
+    // Auto-fill room from URL
+    const urlRoom = new URLSearchParams(window.location.search).get('room');
+    if(urlRoom) document.getElementById('room-id').value = urlRoom;
 
-    peer.on('error', (err) => {
-        status.innerText = "Error: " + err.type;
-        console.error(err);
-    });
-
-    // Copy to clipboard trick
-    myIdDisplay.onclick = () => {
-        navigator.clipboard.writeText(myIdDisplay.innerText);
-        alert("ID Copied!");
-    };
-
-    let conn;
-    let mySecret = null, opponentSecret = null, myTurn = false;
-
-    // Incoming connection
-    peer.on('connection', (connection) => {
-        conn = connection;
-        setupConnection();
-    });
-
-    function connectToFriend() {
-        const friendId = document.getElementById('join-id').value;
-        if (!friendId) return alert("Paste an ID first!");
-        conn = peer.connect(friendId);
-        status.innerText = "Connecting...";
-        setupConnection();
+    function show(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
     }
 
-    function setupConnection() {
-        conn.on('open', () => {
-            status.innerText = "CONNECTED! Now set your secret numbers.";
-            document.getElementById('connection-area').classList.add('hidden');
-            document.getElementById('game-area').classList.remove('hidden');
-        });
+    function startPeer(role) {
+        myName = document.getElementById('player-name').value.trim() || "Player";
+        roomID = document.getElementById('room-id').value.trim();
+        if(!roomID) return alert("Enter Room Name");
+        
+        myRole = role;
+        // Use a static prefix to prevent world-wide collisions
+        const finalID = "DUEL_" + roomID; 
+        
+        peer = new Peer(finalID + "-" + role);
+        show('page-waiting');
+        document.getElementById('status-log').innerText = "Connecting...";
 
-        conn.on('data', (data) => {
-            if (data.type === 'secret_set') {
-                opponentSecret = data.value;
-                status.innerText = "Opponent is ready!";
-                checkStart();
-            } else if (data.type === 'guess') {
-                handleOpponentGuess(data.value);
+        peer.on('open', () => {
+            document.getElementById('status-log').innerText = role === 'p1' ? "Waiting for friend to join..." : "Joining " + roomID + "...";
+            if(role === 'p2') {
+                conn = peer.connect(finalID + "-p1");
+                handleConn();
             }
         });
+
+        peer.on('connection', c => {
+            conn = c;
+            handleConn();
+        });
     }
 
-    function sendSecret() {
-        const val = parseInt(document.getElementById('my-secret').value);
-        if (val < 1 || val > 100) return alert("1-100 only!");
-        mySecret = val;
-        conn.send({ type: 'secret_set', value: mySecret });
-        document.getElementById('setup-phase').innerHTML = "<p>✅ Secret Locked! Waiting for opponent...</p>";
-        checkStart();
+    function handleConn() {
+        conn.on('open', () => {
+            // Send name but DON'T wait for it to show the next screen
+            conn.send({ type: 'intro', name: myName });
+            show('page-secret');
+        });
+
+        conn.on('data', data => {
+            if(data.type === 'intro') {
+                oppName = data.name;
+                document.getElementById('label-me').innerText = `${myName}'s Vault`;
+                document.getElementById('label-friend').innerText = `${oppName}'s Vault`;
+            }
+            else if(data.type === 'secret') { oppSecret = data.val; checkReady(); }
+            else if(data.type === 'guess') { 
+                const dir = data.val < mySecret ? "↑" : "↓";
+                addHistory('friend-history', data.val, dir); 
+                myTurn = true; updateUI(); 
+            }
+            else if(data.type === 'win') { showRes("DEFEAT", `${oppName} found your number: ${mySecret}`); }
+            else if(data.type === 'reset') { performReset(); }
+        });
     }
 
-    function checkStart() {
-        if (mySecret && opponentSecret) {
-            document.getElementById('play-phase').classList.remove('hidden');
-            myTurn = peer.id < conn.peer; 
+    function share() {
+        const url = window.location.href.split('?')[0] + "?room=" + roomID;
+        window.open(`https://wa.me/?text=Duel Me! Room: ${roomID}. Link: ${url}`);
+    }
+
+    function lock() {
+        mySecret = parseInt(document.getElementById('secret-input').value);
+        if(isNaN(mySecret) || mySecret < 1 || mySecret > 100) return alert("Pick 1-100");
+        conn.send({ type: 'secret', val: mySecret });
+        document.getElementById('secret-setup').classList.remove('active');
+        document.getElementById('wait-status').classList.add('active');
+        checkReady();
+    }
+
+    function checkReady() {
+        if(mySecret && oppSecret) {
+            document.getElementById('my-vault-coin').innerText = mySecret;
+            show('page-battle');
+            myTurn = (myRole === 'p1');
             updateUI();
         }
+    }
+
+    function fire() {
+        const g = parseInt(document.getElementById('guess-input').value);
+        if(isNaN(g)) return;
+        if(g === oppSecret) {
+            conn.send({ type: 'win' });
+            showRes("VICTORY", `You solved ${oppName}'s core: ${g}`);
+        } else {
+            const dir = g < oppSecret ? "↑" : "↓";
+            addHistory('my-history', g, dir);
+            document.getElementById('hint-text').innerText = g < oppSecret ? "HIGHER ↑" : "LOWER ↓";
+            myLives--;
+            if(myLives <= 0) { showRes("FAILED", `${oppName}'s number was ${oppSecret}`); }
+            else { conn.send({ type: 'guess', val: g }); myTurn = false; updateUI(); }
+        }
+        document.getElementById('guess-input').value = "";
+    }
+
+    function addHistory(id, val, dir) {
+        const listEl = document.getElementById(id);
+        const el = document.createElement('div');
+        el.className = 'history-item-mini';
+        el.innerHTML = `<span>${val}</span><span style="color:${dir === "↑" ? '#55efc4' : '#fab1a0'}">${dir}</span>`;
+        listEl.prepend(el);
     }
 
     function updateUI() {
-        document.getElementById('turn-indicator').innerText = myTurn ? "YOUR TURN" : "WAITING FOR FRIEND...";
+        document.getElementById('lives-display').innerText = "❤️".repeat(myLives) + "🖤".repeat(7 - myLives);
+        document.getElementById('turn-text').innerText = myTurn ? `${myName}'s PROBE` : `${oppName}'s PROBE`;
         document.getElementById('guess-btn').disabled = !myTurn;
-        status.innerText = "Game in progress";
     }
 
-    function sendGuess() {
-        const g = parseInt(document.getElementById('my-guess').value);
-        if (g === opponentSecret) {
-            alert("VICTORY! You guessed it! 🎉");
-            location.reload();
-        } else {
-            const hint = g < opponentSecret ? "HIGHER! 📈" : "LOWER! 📉";
-            document.getElementById('hint-msg').innerText = "Last hint: " + hint;
-            conn.send({ type: 'guess', value: g });
-            myTurn = false;
-            updateUI();
-        }
-    }
-
-    function handleOpponentGuess(val) {
-        if (val === mySecret) {
-            alert("DEFEAT! They guessed your number. 💀");
-            location.reload();
-        } else {
-            myTurn = true;
-            updateUI();
-        }
+    function showRes(t, m) { show('page-result'); document.getElementById('res-title').innerText = t; document.getElementById('res-msg').innerText = m; }
+    function requestReset() { conn.send({ type: 'reset' }); performReset(); }
+    
+    function performReset() {
+        mySecret = null; oppSecret = null; myLives = 7; myTurn = false;
+        document.getElementById('my-history').innerHTML = ""; 
+        document.getElementById('friend-history').innerHTML = "";
+        document.getElementById('hint-text').innerText = ""; 
+        document.getElementById('secret-input').value = "";
+        document.getElementById('secret-setup').classList.add('active'); 
+        document.getElementById('wait-status').classList.remove('active');
+        show('page-secret');
     }
 </script>
 </body>
